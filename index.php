@@ -5,11 +5,11 @@ header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
 header('Content-Type: application/json');
 
-// Στοιχεία σύνδεσης MySQL (PebbleHost)[cite: 3]
-$host = 'uk02-sql.pebblehost.com';[cite: 3]
-$db   = 'customer_1492946_ajLeaderboards';[cite: 3]
-$user = 'customer_1492946_ajLeaderboards';[cite: 3]
-$pass = 'CdVtoTa=rof231sr8fa1PGy^';[cite: 3]
+// Στοιχεία σύνδεσης MySQL (PebbleHost)
+$host = 'uk02-sql.pebblehost.com';
+$db   = 'customer_1492946_ajLeaderboards';
+$user = 'customer_1492946_ajLeaderboards';
+$pass = 'CdVtoTa=rof231sr8fa1PGy^';
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
