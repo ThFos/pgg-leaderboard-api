@@ -2,7 +2,6 @@
 header("Access-Control-Allow-Origin: *");
 header('Content-Type: application/json');
 
-// Στοιχεία Βάσης
 $host = 'uk02-sql.pebblehost.com';
 $db   = 'customer_1492946_ajLeaderboards';
 $user = 'customer_1492946_ajLeaderboards';
@@ -14,7 +13,7 @@ try {
     $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // JOIN για το ιστορικό ΚΑΙ τον πίνακα των URL skins για έξτρα ταχύτητα
+    // Χρησιμοποιούμε το REPLACE() για να σιγουρευτούμε ότι τα UUIDs θα κάνουν match ανεξάρτητα από το αν έχουν παύλες ή όχι.
     $srJoin = "LEFT JOIN (
                 SELECT h1.uuid, h1.skin_identifier, h1.skin_type 
                 FROM skinrestorer_player_history h1
@@ -23,20 +22,20 @@ try {
                     FROM skinrestorer_player_history 
                     GROUP BY uuid
                 ) h2 ON h1.uuid = h2.uuid AND h1.timestamp = h2.max_time
-            ) sr ON t.id = sr.uuid
+            ) sr ON REPLACE(t.id, '-', '') = REPLACE(sr.uuid, '-', '')
             LEFT JOIN skinrestorer_url_skins urls ON sr.skin_identifier = urls.url";
 
     if ($period === 'weekly') {
         $sql = "SELECT t.id as uuid, t.weekly_delta as value, a.realname as username, sr.skin_identifier, sr.skin_type, urls.value as skin_base64 
                 FROM ajlb_statistic_play_one_minute t 
-                LEFT JOIN authme a ON t.id = a.uuid 
+                LEFT JOIN authme a ON REPLACE(t.id, '-', '') = REPLACE(a.uuid, '-', '')
                 {$srJoin}
                 ORDER BY CAST(t.weekly_delta AS UNSIGNED) DESC 
                 LIMIT 25";
     } else {
         $sql = "SELECT t.id as uuid, t.value, a.realname as username, sr.skin_identifier, sr.skin_type, urls.value as skin_base64 
                 FROM ajlb_statistic_play_one_minute t 
-                LEFT JOIN authme a ON t.id = a.uuid 
+                LEFT JOIN authme a ON REPLACE(t.id, '-', '') = REPLACE(a.uuid, '-', '')
                 {$srJoin}
                 ORDER BY CAST(t.value AS UNSIGNED) DESC 
                 LIMIT 25";
@@ -58,16 +57,14 @@ try {
         $skinId   = trim($row['skin_identifier'] ?? '');
         $skinBase64 = trim($row['skin_base64'] ?? '');
 
-        // Fallback head URL (αν δεν έχει skin)
+        // Fallback head URL
         $headUrl = "https://mc-heads.net/avatar/" . urlencode($username) . "/50";
 
         if (!empty($skinId)) {
-            // Αν είναι Custom URL Skin
             if ($skinType === 'URL' || filter_var($skinId, FILTER_VALIDATE_URL) || strpos($skinId, 'http') === 0) {
-                
                 $textureUrl = '';
                 
-                // 1. Δοκιμάζουμε να πάρουμε το URL απευθείας από τη βάση σου (πολύ πιο γρήγορο)
+                // Διάβασμα απευθείας από τη βάση σου
                 if (!empty($skinBase64)) {
                     $decoded = base64_decode($skinBase64);
                     if ($decoded) {
@@ -78,7 +75,7 @@ try {
                     }
                 }
 
-                // 2. Fallback στο API του Mineskin αν δεν βρέθηκε στη βάση σου
+                // Fallback στο Mineskin API
                 if (empty($textureUrl) && strpos($skinId, 'minesk.in/') !== false) {
                     $mineskinId = basename(parse_url($skinId, PHP_URL_PATH));
                     $ch = curl_init("https://api.mineskin.org/get/uuid/" . $mineskinId);
@@ -96,12 +93,10 @@ try {
                     }
                 }
                 
-                // 3. Αν δεν το βρήκαμε με κανέναν τρόπο, κρατάμε το αρχικό link (μήπως είναι ήδη .png)
                 if (empty($textureUrl)) {
                     $textureUrl = $skinId;
                 }
 
-                // --- Λήψη & Κοπή Εικόνας μέσω cURL & GD Library ---
                 if ($hasGd && !empty($textureUrl)) {
                     $ch = curl_init($textureUrl);
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -119,7 +114,6 @@ try {
                             $transparent = imagecolorallocatealpha($headImg, 0, 0, 0, 127);
                             imagefill($headImg, 0, 0, $transparent);
                             
-                            // Κοπή προσώπου και καπέλου/μαλλιών (overlay)
                             imagecopyresampled($headImg, $skinImg, 0, 0, 8, 8, 50, 50, 8, 8);
                             imagecopyresampled($headImg, $skinImg, 0, 0, 40, 8, 50, 50, 8, 8);
                             
@@ -133,16 +127,17 @@ try {
                     }
                 }
             } else {
-                // Αν είναι απλό όνομα premium skin (π.χ. Notch)
                 $headUrl = "https://mc-heads.net/avatar/" . urlencode($skinId) . "/50";
             }
         }
 
         $formattedData[] = [
-            'uuid'     => $row['uuid'],
-            'username' => $username,
-            'playtime' => $hours . ' hrs',
-            'headUrl'  => $headUrl
+            'uuid'         => $row['uuid'],
+            'username'     => $username,
+            'playtime'     => $hours . ' hrs',
+            'headUrl'      => $headUrl,
+            'debug_skinId' => $skinId, // ΝΕΟ: Βλέπουμε αν η SQL βρήκε όντως το skin
+            'debug_hasGd'  => $hasGd   // ΝΕΟ: Βλέπουμε αν το Render.com υποστηρίζει εικόνες
         ];
     }
 
