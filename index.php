@@ -9,34 +9,22 @@ $pass = 'CdVtoTa=rof231sr8fa1PGy^';
 
 $period = isset($_GET['period']) ? $_GET['period'] : 'all';
 
-// Ορίζουμε το placeholder ανάλογα με την περίοδο
-$placeholder = ($period === 'weekly') ? 'statistic_play_one_minute_weekly' : 'statistic_play_one_minute';
+// Επιλέγουμε τον αντίστοιχo πίνακα ανάλογα με την περίοδο
+$table = ($period === 'weekly') ? 'ajlb_statistic_play_one_minute_weekly' : 'ajlb_statistic_play_one_minute';
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    $sql = "SELECT e.id as uuid, e.value, a.realname as username 
-            FROM ajlb_extras e 
-            LEFT JOIN authme a ON e.id = a.uuid 
-            WHERE e.placeholder = ? 
-            ORDER BY CAST(e.value AS UNSIGNED) DESC 
+    $sql = "SELECT t.id as uuid, t.value, a.realname as username 
+            FROM $table t 
+            LEFT JOIN authme a ON t.id = a.uuid 
+            ORDER BY CAST(t.value AS UNSIGNED) DESC 
             LIMIT 25";
             
     $stmt = $pdo->prepare($sql);
-    $stmt->execute([$placeholder]);
+    $stmt->execute();
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    // Debugging: Αν είναι κενό το weekly, μπορούμε να ελέγξουμε τι placeholders υπάρχουν στη βάση
-    if (empty($results) && $period === 'weekly') {
-        $checkStmt = $pdo->query("SELECT DISTINCT placeholder FROM ajlb_extras LIMIT 10");
-        $availablePlaceholders = $checkStmt->fetchAll(PDO::FETCH_COLUMN);
-        
-        // Αν θέλετε να δείτε ποια ονόματα υπάρχουν διαθέσιμα στη βάση σας, 
-        // μπορείτε προσωρινά να επιστρέψετε αυτά τα δεδομένα:
-        // echo json_encode(["error" => "Placeholder not found", "available" => $availablePlaceholders]);
-        // exit;
-    }
 
     $formattedData = [];
 
@@ -56,6 +44,7 @@ try {
     echo json_encode($formattedData);
 
 } catch (PDOException $e) {
-    echo json_encode(["error" => $e->getMessage()]);
+    // Αν ο πίνακας weekly δεν έχει δημιουργηθεί ακόμα, επιστρέφει κενή λίστα αντί για σφάλμα
+    echo json_encode([]);
 }
 ?>
