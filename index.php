@@ -13,9 +13,8 @@ try {
     $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // Συνδέουμε και το skinrestorer_players και το history για μέγιστη συμβατότητα
-    $srJoin = "LEFT JOIN skinrestorer_players sp ON t.id = sp.uuid
-               LEFT JOIN (
+    // Χρησιμοποιούμε αποκλειστικά το skinrestorer_player_history που υπάρχει στη βάση σου
+    $srJoin = "LEFT JOIN (
                 SELECT h1.uuid, h1.skin_identifier, h1.skin_type 
                 FROM skinrestorer_player_history h1
                 INNER JOIN (
@@ -26,14 +25,14 @@ try {
             ) sr ON t.id = sr.uuid";
 
     if ($period === 'weekly') {
-        $sql = "SELECT t.id as uuid, t.weekly_delta as value, a.realname as username, sp.skin as player_skin, sr.skin_identifier, sr.skin_type 
+        $sql = "SELECT t.id as uuid, t.weekly_delta as value, a.realname as username, sr.skin_identifier, sr.skin_type 
                 FROM ajlb_statistic_play_one_minute t 
                 LEFT JOIN authme a ON t.id = a.uuid 
                 {$srJoin}
                 ORDER BY CAST(t.weekly_delta AS UNSIGNED) DESC 
                 LIMIT 25";
     } else {
-        $sql = "SELECT t.id as uuid, t.value, a.realname as username, sp.skin as player_skin, sr.skin_identifier, sr.skin_type 
+        $sql = "SELECT t.id as uuid, t.value, a.realname as username, sr.skin_identifier, sr.skin_type 
                 FROM ajlb_statistic_play_one_minute t 
                 LEFT JOIN authme a ON t.id = a.uuid 
                 {$srJoin}
@@ -54,16 +53,13 @@ try {
         
         $username = !empty($row['username']) ? trim($row['username']) : "Player_" . substr($row['uuid'], 0, 5);
         $skinType = strtoupper(trim($row['skin_type'] ?? ''));
-        
-        // Παίρνουμε το skin είτε από το history είτε απευθείας από το skinrestorer_players
-        $skinId = trim($row['skin_identifier'] ?? '');
-        if (empty($skinId) && !empty($row['player_skin'])) {
-            $skinId = trim($row['player_skin']);
-        }
+        $skinId   = trim($row['skin_identifier'] ?? '');
 
+        // Fallback head URL
         $headUrl = "https://mc-heads.net/avatar/" . urlencode($username) . "/50";
 
         if (!empty($skinId)) {
+            // Ελέγχουμε αν είναι URL (Imgur, Mineskin, κλπ.)
             if ($skinType === 'URL' || filter_var($skinId, FILTER_VALIDATE_URL) || strpos($skinId, 'http') === 0) {
                 if ($hasGd) {
                     $context = stream_context_create([
@@ -78,6 +74,7 @@ try {
                             $transparent = imagecolorallocatealpha($headImg, 0, 0, 0, 127);
                             imagefill($headImg, 0, 0, $transparent);
                             
+                            // Κοπή προσώπου και καπέλου
                             imagecopyresampled($headImg, $skinImg, 0, 0, 8, 8, 50, 50, 8, 8);
                             imagecopyresampled($headImg, $skinImg, 0, 0, 40, 8, 50, 50, 8, 8);
                             
@@ -91,6 +88,7 @@ try {
                     }
                 }
             } else {
+                // Αν είναι απλό όνομα skin
                 $headUrl = "https://mc-heads.net/avatar/" . urlencode($skinId) . "/50";
             }
         }
@@ -106,6 +104,7 @@ try {
     echo json_encode($formattedData);
 
 } catch (PDOException $e) {
-    echo json_encode([]);
+    // Εμφάνιση σφάλματος για ευκολότερο debugging
+    echo json_encode(["error" => $e->getMessage()]);
 }
 ?>
