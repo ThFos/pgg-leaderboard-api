@@ -13,7 +13,13 @@ try {
     $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // 1. Τραβάμε τα δεδομένα από το ajlb_extras
+    // Δημιουργία πίνακα ονομάτων αυτόματα αν δεν υπάρχει
+    $pdo->exec("CREATE TABLE IF NOT EXISTS pgg_player_names (
+        uuid VARCHAR(64) PRIMARY KEY,
+        display_name VARCHAR(255)
+    )");
+
+    // Τραβάμε τα Top 25 playtime από το ajLeaderboards
     $stmt = $pdo->prepare("SELECT id as uuid, value FROM ajlb_extras WHERE placeholder = ? ORDER BY CAST(value AS UNSIGNED) DESC LIMIT 25");
     $stmt->execute(['statistic_play_one_minute']);
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -25,20 +31,16 @@ try {
         $hours = round($ticks / 72000, 2);
         $uuid = $row['uuid'];
 
-        // Προεπιλεγμένο όνομα ασφαλείας
+        // Default fallback όνομα
         $username = "Player_" . substr($uuid, 0, 5);
 
-        // 2. Προσπάθεια ανάγνωσης ονόματος από τον πίνακα ajlb_players (αν υπάρχει)
-        try {
-            $stmtPlayer = $pdo->prepare("SELECT name FROM ajlb_players WHERE uuid = ?");
-            $stmtPlayer->execute([$uuid]);
-            $playerRow = $stmtPlayer->fetch(PDO::FETCH_ASSOC);
-            
-            if ($playerRow && !empty($playerRow['name'])) {
-                $username = $playerRow['name'];
-            }
-        } catch (Exception $ex) {
-            // Αν δεν υπάρχει ο πίνακας ajlb_players, αγνοείται σιωπηρά και μένει το fallback
+        // Ψάχνουμε αν υπάρχει αποθηκευμένο όνομα/RP όνομα στον πίνακα
+        $stmtName = $pdo->prepare("SELECT display_name FROM pgg_player_names WHERE uuid = ?");
+        $stmtName.execute([$uuid]);
+        $nameRow = $stmtName->fetch(PDO::FETCH_ASSOC);
+
+        if ($nameRow && !empty($nameRow['display_name'])) {
+            $username = $nameRow['display_name'];
         }
 
         $formattedData[] = [
