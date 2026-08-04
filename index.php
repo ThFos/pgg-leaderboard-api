@@ -34,43 +34,18 @@ try {
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
     $formattedData = [];
 
-    $hasGd = extension_loaded('gd');
-
     foreach ($results as $row) {
         $ticks = intval($row['value']);
         $hours = round($ticks / 72000, 2);
         
         $username = !empty($row['username']) ? $row['username'] : "Player_" . substr($row['uuid'], 0, 5);
-        $headUrl = "https://mc-heads.net/avatar/" . $row['uuid'] . "/50";
-
-        if ($hasGd && $row['skin_type'] === 'URL' && !empty($row['skin_identifier'])) {
-            $skinContent = @file_get_contents($row['skin_identifier']);
-            if ($skinContent !== false) {
-                $skinImg = @imagecreatefromstring($skinContent);
-                if ($skinImg !== false) {
-                    $headImg = imagecreatetruecolor(50, 50);
-                    imagesavealpha($headImg, true);
-                    $transparent = imagecolorallocatealpha($headImg, 0, 0, 0, 127);
-                    imagefill($headImg, 0, 0, $transparent);
-                    
-                    imagecopyresampled($headImg, $skinImg, 0, 0, 8, 8, 50, 50, 8, 8);
-                    imagecopyresampled($headImg, $skinImg, 0, 0, 40, 8, 50, 50, 8, 8);
-                    
-                    ob_start();
-                    imagepng($headImg);
-                    $headUrl = 'data:image/png;base64,' . base64_encode(ob_get_clean());
-                    
-                    imagedestroy($skinImg);
-                    imagedestroy($headImg);
-                }
-            }
-        }
 
         $formattedData[] = [
             'uuid' => $row['uuid'],
             'username' => $username,
             'playtime' => $hours . ' hrs',
-            'headUrl' => $headUrl
+            'skin_type' => $row['skin_type'],
+            'skin_identifier' => $row['skin_identifier']
         ];
     }
 
