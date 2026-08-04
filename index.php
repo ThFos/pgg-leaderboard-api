@@ -22,29 +22,20 @@ try {
         $ticks = intval($row['value']);
         $hours = round($ticks / 72000, 2);
 
-        $uuidClean = str_replace('-', '', $row['uuid']);
-        $username = "Player";
+        $uuid = $row['uuid'];
 
-        // Χρησιμοποιούμε το Minetools API γιατί δεν μπλοκάρει από το Render
-        $apiUrl = "https://api.minetools.eu/profile/" . $uuidClean;
-        $opts = ['http' => ['header' => "User-Agent: Mozilla/5.0\r\n", 'timeout' => 3]];
-        $context = stream_context_create($opts);
-        $response = @file_get_contents($apiUrl, false, $context);
-        
-        if ($response) {
-            $data = json_decode($response, true);
-            if (isset($data['decoded']['profileName'])) {
-                $username = $data['decoded']['profileName'];
-            }
-        }
+        // Λίστα με τα ονόματα των παίκτών βάσει του UUID τους
+        $knownPlayers = [
+            'b0635010-209e-37d0-9573-39a7e4cf18f3' => 'ThFos'
+            // Αν θες να προσθέσεις κι άλλον παίκτη στο μέλλον, τον βάζεις έτσι:
+            // 'άλλο-uuid-εδώ' => 'ΌνομαΠαίκτη'
+        ];
 
-        // Fallback αν δεν βρεθεί όνομα
-        if ($username === "Player" || empty($username)) {
-            $username = "Player_" . substr($row['uuid'], 0, 5);
-        }
+        // Αν υπάρχει στη λίστα παίρνει το σωστό όνομα, αλλιώς βάζει προσωρινό
+        $username = isset($knownPlayers[$uuid]) ? $knownPlayers[$uuid] : "Player";
 
         $formattedData[] = [
-            'uuid' => $row['uuid'],
+            'uuid' => $uuid,
             'username' => $username,
             'playtime' => $hours . ' hrs'
         ];
