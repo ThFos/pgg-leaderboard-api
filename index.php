@@ -13,14 +13,8 @@ try {
     $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // 1. Παίρνουμε τους Top 25 παίκτες με βάση το playtime
-    $sql = "SELECT e.id as uuid, e.value 
-            FROM ajlb_extras e 
-            WHERE e.placeholder = ? 
-            ORDER BY CAST(e.value AS UNSIGNED) DESC 
-            LIMIT 25";
-
-    $stmt = $pdo->prepare($sql);
+    // 1. Τραβάμε τα δεδομένα από το ajlb_extras
+    $stmt = $pdo->prepare("SELECT id as uuid, value FROM ajlb_extras WHERE placeholder = ? ORDER BY CAST(value AS UNSIGNED) DESC LIMIT 25");
     $stmt->execute(['statistic_play_one_minute']);
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -31,20 +25,20 @@ try {
         $hours = round($ticks / 72000, 2);
         $uuid = $row['uuid'];
 
-        // Αρχική τιμή username (fallback)
+        // Προεπιλεγμένο όνομα ασφαλείας
         $username = "Player_" . substr($uuid, 0, 5);
 
-        // 2. Ψάχνουμε στη βάση αν το Skript έχει αποθηκεύσει όνομα χαρακτήρα για αυτό το UUID
-        // (Το Skript αποθηκεύει τις μεταβλητές στον πίνακα skript_variables ή αντίστοιχο ανάλογα την έκδοση, 
-        // αλλά ο ασφαλέστερος τρόπος είναι να τσεκάρουμε τον πίνακα παικτών του ajLeaderboards ή τα aliases)
-        
-        // Εναλλακτικά, τραβάμε το όνομα από τον πίνακα ajlb_players του ajLeaderboards
-        $stmtPlayer = $pdo->prepare("SELECT name FROM ajlb_players WHERE uuid = ?");
-        $stmtPlayer->execute([$uuid]);
-        $playerRow = $stmtPlayer->fetch(PDO::FETCH_ASSOC);
-        
-        if ($playerRow && !empty($playerRow['name'])) {
-            $username = $playerRow['name'];
+        // 2. Προσπάθεια ανάγνωσης ονόματος από τον πίνακα ajlb_players (αν υπάρχει)
+        try {
+            $stmtPlayer = $pdo->prepare("SELECT name FROM ajlb_players WHERE uuid = ?");
+            $stmtPlayer->execute([$uuid]);
+            $playerRow = $stmtPlayer->fetch(PDO::FETCH_ASSOC);
+            
+            if ($playerRow && !empty($playerRow['name'])) {
+                $username = $playerRow['name'];
+            }
+        } catch (Exception $ex) {
+            // Αν δεν υπάρχει ο πίνακας ajlb_players, αγνοείται σιωπηρά και μένει το fallback
         }
 
         $formattedData[] = [
@@ -57,6 +51,6 @@ try {
     echo json_encode($formattedData);
 
 } catch (PDOException $e) {
-    echo json_encode([]);
+    echo json_encode(["error" => $e->getMessage()]);
 }
 ?>
