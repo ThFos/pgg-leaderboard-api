@@ -41,13 +41,39 @@ try {
         $hours = round($ticks / 72000, 2);
         
         $username = !empty($row['username']) ? $row['username'] : "Player_" . substr($row['uuid'], 0, 5);
+        
+        // Προετοιμασία avatar (URL skin μέσω PHP GD ή mc-heads)
+        $headUrl = "https://mc-heads.net/avatar/" . $row['uuid'] . "/50";
+
+        if ($row['skin_type'] === 'URL' && !empty($row['skin_identifier'])) {
+            $skinContent = @file_get_contents($row['skin_identifier']);
+            if ($skinContent !== false) {
+                $skinImg = @imagecreatefromstring($skinContent);
+                if ($skinImg !== false) {
+                    $headImg = imagecreatetruecolor(50, 50);
+                    imagesavealpha($headImg, true);
+                    $transparent = imagecolorallocatealpha($headImg, 0, 0, 0, 127);
+                    imagefill($headImg, 0, 0, $transparent);
+                    
+                    // Κόψιμο βάσης κεφαλιού και καπέλου
+                    imagecopyresampled($headImg, $skinImg, 0, 0, 8, 8, 50, 50, 8, 8);
+                    imagecopyresampled($headImg, $skinImg, 0, 0, 40, 8, 50, 50, 8, 8);
+                    
+                    ob_start();
+                    imagepng($headImg);
+                    $headUrl = 'data:image/png;base64,' . base64_encode(ob_get_clean());
+                    
+                    imagedestroy($skinImg);
+                    imagedestroy($headImg);
+                }
+            }
+        }
 
         $formattedData[] = [
             'uuid' => $row['uuid'],
             'username' => $username,
             'playtime' => $hours . ' hrs',
-            'skin_identifier' => $row['skin_identifier'],
-            'skin_type' => $row['skin_type']
+            'headUrl' => $headUrl
         ];
     }
 
