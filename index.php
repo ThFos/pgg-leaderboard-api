@@ -13,19 +13,29 @@ try {
     $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // SQL ερώτημα βάσει του περιοδικού πίνακα playtime και SkinRestorer[cite: 11]
+    // Διόρθωση: Σύνδεση με τον πίνακα skinrestorer_player_history παίρνοντας το πιο πρόσφατο skin ανά UUID
+    $srJoin = "LEFT JOIN (
+                SELECT h1.uuid, h1.skin_identifier, h1.skin_type 
+                FROM skinrestorer_player_history h1
+                INNER JOIN (
+                    SELECT uuid, MAX(timestamp) as max_time 
+                    FROM skinrestorer_player_history 
+                    GROUP BY uuid
+                ) h2 ON h1.uuid = h2.uuid AND h1.timestamp = h2.max_time
+            ) sr ON t.id = sr.uuid";
+
     if ($period === 'weekly') {
         $sql = "SELECT t.id as uuid, t.weekly_delta as value, a.realname as username, sr.skin_identifier, sr.skin_type 
                 FROM ajlb_statistic_play_one_minute t 
                 LEFT JOIN authme a ON t.id = a.uuid 
-                LEFT JOIN skinrestorer_players sr ON t.id = sr.uuid 
+                {$srJoin}
                 ORDER BY CAST(t.weekly_delta AS UNSIGNED) DESC 
                 LIMIT 25";
     } else {
         $sql = "SELECT t.id as uuid, t.value, a.realname as username, sr.skin_identifier, sr.skin_type 
                 FROM ajlb_statistic_play_one_minute t 
                 LEFT JOIN authme a ON t.id = a.uuid 
-                LEFT JOIN skinrestorer_players sr ON t.id = sr.uuid 
+                {$srJoin}
                 ORDER BY CAST(t.value AS UNSIGNED) DESC 
                 LIMIT 25";
     }
@@ -49,7 +59,7 @@ try {
         $headUrl = "https://mc-heads.net/avatar/" . urlencode($username) . "/50";
 
         if (!empty($skinId)) {
-            // Αν το skin είναι τύπου URL (π.χ. Imgur)
+            // Αν είναι Imgur link ή URL
             if ($skinType === 'URL' || filter_var($skinId, FILTER_VALIDATE_URL) || strpos($skinId, 'http') === 0) {
                 if ($hasGd) {
                     $context = stream_context_create([
@@ -79,7 +89,7 @@ try {
                     }
                 }
             } else {
-                // Αν είναι όνομα από το SkinRestorer
+                // Αν είναι όνομα skin
                 $headUrl = "https://mc-heads.net/avatar/" . urlencode($skinId) . "/50";
             }
         }
@@ -88,7 +98,7 @@ try {
             'uuid'     => $row['uuid'],
             'username' => $username,
             'playtime' => $hours . ' hrs',
-            'headUrl'  => $headUrl
+            'headUrl'  -> $headUrl
         ];
     }
 
