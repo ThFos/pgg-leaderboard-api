@@ -13,7 +13,9 @@ try {
     $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    $srJoin = "LEFT JOIN (
+    // Συνδέουμε και το skinrestorer_players και το history για μέγιστη συμβατότητα
+    $srJoin = "LEFT JOIN skinrestorer_players sp ON t.id = sp.uuid
+               LEFT JOIN (
                 SELECT h1.uuid, h1.skin_identifier, h1.skin_type 
                 FROM skinrestorer_player_history h1
                 INNER JOIN (
@@ -24,14 +26,14 @@ try {
             ) sr ON t.id = sr.uuid";
 
     if ($period === 'weekly') {
-        $sql = "SELECT t.id as uuid, t.weekly_delta as value, a.realname as username, sr.skin_identifier, sr.skin_type 
+        $sql = "SELECT t.id as uuid, t.weekly_delta as value, a.realname as username, sp.skin as player_skin, sr.skin_identifier, sr.skin_type 
                 FROM ajlb_statistic_play_one_minute t 
                 LEFT JOIN authme a ON t.id = a.uuid 
                 {$srJoin}
                 ORDER BY CAST(t.weekly_delta AS UNSIGNED) DESC 
                 LIMIT 25";
     } else {
-        $sql = "SELECT t.id as uuid, t.value, a.realname as username, sr.skin_identifier, sr.skin_type 
+        $sql = "SELECT t.id as uuid, t.value, a.realname as username, sp.skin as player_skin, sr.skin_identifier, sr.skin_type 
                 FROM ajlb_statistic_play_one_minute t 
                 LEFT JOIN authme a ON t.id = a.uuid 
                 {$srJoin}
@@ -52,7 +54,12 @@ try {
         
         $username = !empty($row['username']) ? trim($row['username']) : "Player_" . substr($row['uuid'], 0, 5);
         $skinType = strtoupper(trim($row['skin_type'] ?? ''));
-        $skinId   = trim($row['skin_identifier'] ?? '');
+        
+        // Παίρνουμε το skin είτε από το history είτε απευθείας από το skinrestorer_players
+        $skinId = trim($row['skin_identifier'] ?? '');
+        if (empty($skinId) && !empty($row['player_skin'])) {
+            $skinId = trim($row['player_skin']);
+        }
 
         $headUrl = "https://mc-heads.net/avatar/" . urlencode($username) . "/50";
 
