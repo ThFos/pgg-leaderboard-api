@@ -7,10 +7,9 @@ $db   = 'customer_1492946_ajLeaderboards';
 $user = 'customer_1492946_ajLeaderboards';
 $pass = 'CdVtoTa=rof231sr8fa1PGy^';
 
-// Ελέγχουμε αν ζήτησε weekly ή all (default είναι all)
 $period = isset($_GET['period']) ? $_GET['period'] : 'all';
 
-// Ανάλογα την επιλογή, διαλέγουμε το σωστό placeholder της ajLeaderboards
+// Ορίζουμε το placeholder ανάλογα με την περίοδο
 $placeholder = ($period === 'weekly') ? 'statistic_play_one_minute_weekly' : 'statistic_play_one_minute';
 
 try {
@@ -27,6 +26,17 @@ try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute([$placeholder]);
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Debugging: Αν είναι κενό το weekly, μπορούμε να ελέγξουμε τι placeholders υπάρχουν στη βάση
+    if (empty($results) && $period === 'weekly') {
+        $checkStmt = $pdo->query("SELECT DISTINCT placeholder FROM ajlb_extras LIMIT 10");
+        $availablePlaceholders = $checkStmt->fetchAll(PDO::FETCH_COLUMN);
+        
+        // Αν θέλετε να δείτε ποια ονόματα υπάρχουν διαθέσιμα στη βάση σας, 
+        // μπορείτε προσωρινά να επιστρέψετε αυτά τα δεδομένα:
+        // echo json_encode(["error" => "Placeholder not found", "available" => $availablePlaceholders]);
+        // exit;
+    }
 
     $formattedData = [];
 
