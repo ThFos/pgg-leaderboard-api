@@ -1,5 +1,5 @@
 <?php
-// Επιτρέπουμε στο GitHub Pages να διαβάζει τα δεδομένα (CORS)
+// Επιτρέπουμε στο site σου να διαβάζει τα δεδομένα (CORS)
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
@@ -15,15 +15,16 @@ try {
     $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // Παίρνουμε τους 5 πρώτους παίκτες από τον πίνακα του ajLeaderboards
-    $stmt = $pdo->query("SELECT player as username, value FROM ajlb_statistic_hours_played ORDER BY CAST(value AS UNSIGNED) DESC LIMIT 5");
+    // Παίρνουμε τους παίκτες από τον πίνακα ajlb_extras για το placeholder των kills
+    $stmt = $pdo->prepare("SELECT id as uuid, value FROM ajlb_extras WHERE placeholder = ? ORDER BY CAST(value AS UNSIGNED) DESC LIMIT 5");
+    $stmt->execute(['statistic_player_kills']);
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $formattedData = [];
-    foreach ($results as $row) {
+    foreach ($results as `row`) {
         $formattedData[] = [
-            'username' => $row['username'],
-            'playtime' => $row['value'] . 'h'
+            'uuid' => $row['uuid'],
+            'value' => $row['value']
         ];
     }
 
