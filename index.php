@@ -13,12 +13,6 @@ try {
     $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // Δημιουργία πίνακα ονομάτων αυτόματα αν δεν υπάρχει
-    $pdo->exec("CREATE TABLE IF NOT EXISTS pgg_player_names (
-        uuid VARCHAR(64) PRIMARY KEY,
-        display_name VARCHAR(255)
-    )");
-
     // Τραβάμε τα Top 25 playtime από το ajLeaderboards
     $stmt = $pdo->prepare("SELECT id as uuid, value FROM ajlb_extras WHERE placeholder = ? ORDER BY CAST(value AS UNSIGNED) DESC LIMIT 25");
     $stmt->execute(['statistic_play_one_minute']);
@@ -26,22 +20,18 @@ try {
 
     $formattedData = [];
     
+    // Εδώ μπορείς να ορίσεις απευθείας αντιστοιχία ονομάτων για να φαίνονται σωστά στο siteι
+    $customNames = [
+        "b0635010-209e-37d0-9573-39a7e4cf18f3" => "ThFos" // Παράδειγμα για τον Θόδωρο
+    ];
+
     foreach ($results as $row) {
         $ticks = intval($row['value']);
         $hours = round($ticks / 72000, 2);
         $uuid = $row['uuid'];
 
-        // Default fallback όνομα
-        $username = "Player_" . substr($uuid, 0, 5);
-
-        // Ψάχνουμε αν υπάρχει αποθηκευμένο όνομα/RP όνομα στον πίνακα
-        $stmtName = $pdo->prepare("SELECT display_name FROM pgg_player_names WHERE uuid = ?");
-        $stmtName.execute([$uuid]);
-        $nameRow = $stmtName->fetch(PDO::FETCH_ASSOC);
-
-        if ($nameRow && !empty($nameRow['display_name'])) {
-            $username = $nameRow['display_name'];
-        }
+        // Ανάθεση ονόματος βάσει λίστας ή fallback
+        $username = isset($customNames[$uuid]) ? $customNames[$uuid] : "Player_" . substr($uuid, 0, 5);
 
         $formattedData[] = [
             'uuid' => $uuid,
