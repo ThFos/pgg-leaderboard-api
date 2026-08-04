@@ -2,6 +2,7 @@
 header("Access-Control-Allow-Origin: *");
 header('Content-Type: application/json');
 
+// Στοιχεία Βάσης
 $host = 'uk02-sql.pebblehost.com';
 $db   = 'customer_1492946_ajLeaderboards';
 $user = 'customer_1492946_ajLeaderboards';
@@ -13,7 +14,7 @@ try {
     $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // Χρησιμοποιούμε αποκλειστικά το skinrestorer_player_history που υπάρχει στη βάση σου
+    // JOIN για το ιστορικό ΚΑΙ τον πίνακα των URL skins για έξτρα ταχύτητα
     $srJoin = "LEFT JOIN (
                 SELECT h1.uuid, h1.skin_identifier, h1.skin_type 
                 FROM skinrestorer_player_history h1
@@ -22,17 +23,18 @@ try {
                     FROM skinrestorer_player_history 
                     GROUP BY uuid
                 ) h2 ON h1.uuid = h2.uuid AND h1.timestamp = h2.max_time
-            ) sr ON t.id = sr.uuid";
+            ) sr ON t.id = sr.uuid
+            LEFT JOIN skinrestorer_url_skins urls ON sr.skin_identifier = urls.url";
 
     if ($period === 'weekly') {
-        $sql = "SELECT t.id as uuid, t.weekly_delta as value, a.realname as username, sr.skin_identifier, sr.skin_type 
+        $sql = "SELECT t.id as uuid, t.weekly_delta as value, a.realname as username, sr.skin_identifier, sr.skin_type, urls.value as skin_base64 
                 FROM ajlb_statistic_play_one_minute t 
                 LEFT JOIN authme a ON t.id = a.uuid 
                 {$srJoin}
                 ORDER BY CAST(t.weekly_delta AS UNSIGNED) DESC 
                 LIMIT 25";
     } else {
-        $sql = "SELECT t.id as uuid, t.value, a.realname as username, sr.skin_identifier, sr.skin_type 
+        $sql = "SELECT t.id as uuid, t.value, a.realname as username, sr.skin_identifier, sr.skin_type, urls.value as skin_base64 
                 FROM ajlb_statistic_play_one_minute t 
                 LEFT JOIN authme a ON t.id = a.uuid 
                 {$srJoin}
@@ -54,35 +56,54 @@ try {
         $username = !empty($row['username']) ? trim($row['username']) : "Player_" . substr($row['uuid'], 0, 5);
         $skinType = strtoupper(trim($row['skin_type'] ?? ''));
         $skinId   = trim($row['skin_identifier'] ?? '');
+        $skinBase64 = trim($row['skin_base64'] ?? '');
 
-        // Fallback head URL
+        // Fallback head URL (αν δεν έχει skin)
         $headUrl = "https://mc-heads.net/avatar/" . urlencode($username) . "/50";
 
         if (!empty($skinId)) {
-            // 1. Έλεγχος αν είναι link
+            // Αν είναι Custom URL Skin
             if ($skinType === 'URL' || filter_var($skinId, FILTER_VALIDATE_URL) || strpos($skinId, 'http') === 0) {
                 
-                // --- Διόρθωση Mineskin API μέσω cURL ---
-                if (strpos($skinId, 'minesk.in/') !== false) {
+                $textureUrl = '';
+                
+                // 1. Δοκιμάζουμε να πάρουμε το URL απευθείας από τη βάση σου (πολύ πιο γρήγορο)
+                if (!empty($skinBase64)) {
+                    $decoded = base64_decode($skinBase64);
+                    if ($decoded) {
+                        $json = json_decode($decoded, true);
+                        if (isset($json['textures']['SKIN']['url'])) {
+                            $textureUrl = $json['textures']['SKIN']['url'];
+                        }
+                    }
+                }
+
+                // 2. Fallback στο API του Mineskin αν δεν βρέθηκε στη βάση σου
+                if (empty($textureUrl) && strpos($skinId, 'minesk.in/') !== false) {
                     $mineskinId = basename(parse_url($skinId, PHP_URL_PATH));
                     $ch = curl_init("https://api.mineskin.org/get/uuid/" . $mineskinId);
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                     curl_setopt($ch, CURLOPT_USERAGENT, 'PGG-Legacy-Leaderboard');
-                    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // Αγνόησε προβλήματα SSL
+                    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
                     $apiJson = curl_exec($ch);
                     curl_close($ch);
                     
                     if ($apiJson) {
                         $data = json_decode($apiJson, true);
                         if (!empty($data['data']['texture']['url'])) {
-                            $skinId = $data['data']['texture']['url']; // Το καθαρό Minecraft Texture URL
+                            $textureUrl = $data['data']['texture']['url'];
                         }
                     }
                 }
                 
-                // --- Λήψη & Κοπή Εικόνας μέσω cURL ---
-                if ($hasGd) {
-                    $ch = curl_init($skinId);
+                // 3. Αν δεν το βρήκαμε με κανέναν τρόπο, κρατάμε το αρχικό link (μήπως είναι ήδη .png)
+                if (empty($textureUrl)) {
+                    $textureUrl = $skinId;
+                }
+
+                // --- Λήψη & Κοπή Εικόνας μέσω cURL & GD Library ---
+                if ($hasGd && !empty($textureUrl)) {
+                    $ch = curl_init($textureUrl);
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                     curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0');
                     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
@@ -98,7 +119,7 @@ try {
                             $transparent = imagecolorallocatealpha($headImg, 0, 0, 0, 127);
                             imagefill($headImg, 0, 0, $transparent);
                             
-                            // Κοπή προσώπου και καπέλου
+                            // Κοπή προσώπου και καπέλου/μαλλιών (overlay)
                             imagecopyresampled($headImg, $skinImg, 0, 0, 8, 8, 50, 50, 8, 8);
                             imagecopyresampled($headImg, $skinImg, 0, 0, 40, 8, 50, 50, 8, 8);
                             
@@ -112,7 +133,7 @@ try {
                     }
                 }
             } else {
-                // Αν είναι απλό όνομα skin (π.χ. Notch)
+                // Αν είναι απλό όνομα premium skin (π.χ. Notch)
                 $headUrl = "https://mc-heads.net/avatar/" . urlencode($skinId) . "/50";
             }
         }
@@ -128,7 +149,6 @@ try {
     echo json_encode($formattedData);
 
 } catch (PDOException $e) {
-    // Εμφάνιση σφάλματος για ευκολότερο debugging
     echo json_encode(["error" => $e->getMessage()]);
 }
 ?>
