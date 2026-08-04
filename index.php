@@ -59,33 +59,38 @@ try {
         $headUrl = "https://mc-heads.net/avatar/" . urlencode($username) . "/50";
 
         if (!empty($skinId)) {
-            // 1. Μετάφραση του minesk.in link στο πραγματικό texture URL μέσω API
-            if (strpos($skinId, 'minesk.in/') !== false) {
-                $mineskinId = basename(parse_url($skinId, PHP_URL_PATH));
-                $apiContext = stream_context_create([
-                    'http' => ['timeout' => 3, 'user_agent' => 'PGG-Legacy-Leaderboard']
-                ]);
-                // Κλήση στο Mineskin API
-                $apiJson = @file_get_contents("https://api.mineskin.org/get/uuid/" . $mineskinId, false, $apiContext);
+            // 1. Έλεγχος αν είναι link
+            if ($skinType === 'URL' || filter_var($skinId, FILTER_VALIDATE_URL) || strpos($skinId, 'http') === 0) {
                 
-                if ($apiJson !== false) {
-                    $data = json_decode($apiJson, true);
-                    if (!empty($data['data']['texture']['url'])) {
-                        // Αντικαθιστούμε το HTML URL με το καθαρό .png από το textures.minecraft.net
-                        $skinId = $data['data']['texture']['url']; 
+                // --- Διόρθωση Mineskin API μέσω cURL ---
+                if (strpos($skinId, 'minesk.in/') !== false) {
+                    $mineskinId = basename(parse_url($skinId, PHP_URL_PATH));
+                    $ch = curl_init("https://api.mineskin.org/get/uuid/" . $mineskinId);
+                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($ch, CURLOPT_USERAGENT, 'PGG-Legacy-Leaderboard');
+                    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // Αγνόησε προβλήματα SSL
+                    $apiJson = curl_exec($ch);
+                    curl_close($ch);
+                    
+                    if ($apiJson) {
+                        $data = json_decode($apiJson, true);
+                        if (!empty($data['data']['texture']['url'])) {
+                            $skinId = $data['data']['texture']['url']; // Το καθαρό Minecraft Texture URL
+                        }
                     }
                 }
-            }
-
-            // 2. Ελέγχουμε αν είναι URL (Imgur, Mineskin -πλέον μεταφρασμένο-, κλπ.)
-            if ($skinType === 'URL' || filter_var($skinId, FILTER_VALIDATE_URL) || strpos($skinId, 'http') === 0) {
+                
+                // --- Λήψη & Κοπή Εικόνας μέσω cURL ---
                 if ($hasGd) {
-                    $context = stream_context_create([
-                        'http' => ['timeout' => 4, 'user_agent' => 'Mozilla/5.0']
-                    ]);
-                    $skinContent = @file_get_contents($skinId, false, $context);
+                    $ch = curl_init($skinId);
+                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0');
+                    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                    $skinContent = curl_exec($ch);
+                    curl_close($ch);
                     
-                    if ($skinContent !== false) {
+                    if ($skinContent) {
                         $skinImg = @imagecreatefromstring($skinContent);
                         if ($skinImg !== false) {
                             $headImg = imagecreatetruecolor(50, 50);
@@ -107,7 +112,7 @@ try {
                     }
                 }
             } else {
-                // Αν είναι απλό όνομα skin
+                // Αν είναι απλό όνομα skin (π.χ. Notch)
                 $headUrl = "https://mc-heads.net/avatar/" . urlencode($skinId) . "/50";
             }
         }
