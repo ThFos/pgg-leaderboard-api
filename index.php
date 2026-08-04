@@ -20,8 +20,6 @@ try {
                 LEFT JOIN skinrestorer_players sr ON t.id = sr.uuid 
                 ORDER BY CAST(t.weekly_delta AS UNSIGNED) DESC 
                 LIMIT 25";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute();
     } else {
         $sql = "SELECT t.id as uuid, t.value, a.realname as username, sr.skin_identifier, sr.skin_type 
                 FROM ajlb_statistic_play_one_minute t 
@@ -29,23 +27,23 @@ try {
                 LEFT JOIN skinrestorer_players sr ON t.id = sr.uuid 
                 ORDER BY CAST(t.value AS UNSIGNED) DESC 
                 LIMIT 25";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute();
     }
 
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute();
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
     $formattedData = [];
+
+    $hasGd = extension_loaded('gd');
 
     foreach ($results as $row) {
         $ticks = intval($row['value']);
         $hours = round($ticks / 72000, 2);
         
         $username = !empty($row['username']) ? $row['username'] : "Player_" . substr($row['uuid'], 0, 5);
-        
-        // Προετοιμασία avatar (URL skin μέσω PHP GD ή mc-heads)
         $headUrl = "https://mc-heads.net/avatar/" . $row['uuid'] . "/50";
 
-        if ($row['skin_type'] === 'URL' && !empty($row['skin_identifier'])) {
+        if ($hasGd && $row['skin_type'] === 'URL' && !empty($row['skin_identifier'])) {
             $skinContent = @file_get_contents($row['skin_identifier']);
             if ($skinContent !== false) {
                 $skinImg = @imagecreatefromstring($skinContent);
@@ -55,7 +53,6 @@ try {
                     $transparent = imagecolorallocatealpha($headImg, 0, 0, 0, 127);
                     imagefill($headImg, 0, 0, $transparent);
                     
-                    // Κόψιμο βάσης κεφαλιού και καπέλου
                     imagecopyresampled($headImg, $skinImg, 0, 0, 8, 8, 50, 50, 8, 8);
                     imagecopyresampled($headImg, $skinImg, 0, 0, 40, 8, 50, 50, 8, 8);
                     
