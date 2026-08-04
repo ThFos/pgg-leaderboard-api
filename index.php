@@ -3,7 +3,7 @@ header("Access-Control-Allow-Origin: *");
 header('Content-Type: application/json');
 
 $host = 'uk02-sql.pebblehost.com';
-$db   = 'customer_1492946_ajLeaderboards';
+$db   = 'customer_1492946_ajLeaderboards'; // Ή η βάση δεδομένων όπου αποθηκεύονται οι πίνακες του AuthMe
 $user = 'customer_1492946_ajLeaderboards';
 $pass = 'CdVtoTa=rof231sr8fa1PGy^';
 
@@ -11,32 +11,31 @@ try {
     $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // 1. Παίρνουμε τα Top 25 playtime από το ajLeaderboards
-    $stmt = $pdo->prepare("SELECT id as uuid, value FROM ajlb_extras WHERE placeholder = ? ORDER BY CAST(value AS UNSIGNED) DESC LIMIT 25");
+    // Συνδυάζουμε το playtime από το ajLeaderboards με το realname από το AuthMe
+    $sql = "SELECT e.id as uuid, e.value, a.realname as username 
+            FROM ajlb_extras e 
+            LEFT JOIN authme a ON e.id = a.uuid 
+            WHERE e.placeholder = ? 
+            ORDER BY CAST(e.value AS UNSIGNED) DESC 
+            LIMIT 25";
+            
+    $stmt = $pdo->prepare($sql);
     $stmt->execute(['statistic_play_one_minute']);
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    // 2. Φορτώνουμε όλα τα αποθηκευμένα cracked ονόματα στη μνήμη για γρήγορη αντιστοίχιση
-    $nameMap = [];
-    $nameStmt = $pdo->query("SELECT uuid, username FROM pgg_player_names");
-    while ($row = $nameStmt->fetch(PDO::FETCH_ASSOC)) {
-        $nameMap[$row['uuid']] = $row['username'];
-    }
 
     $formattedData = [];
 
     foreach ($results as $row) {
         $ticks = intval($row['value']);
         $hours = round($ticks / 72000, 2);
-        $uuid = $row['uuid'];
-
-        // Ανάγνωση του cracked ονόματος από τη βάση μας (με fallback αν λείπει)
-        $username = isset($nameMap[$uuid]) ? $nameMap[$uuid] : "Player_" . substr($uuid, 0, 5);
+        
+        // Αν για κάποιο λόγο δεν βρεθεί στον πίνακα του AuthMe, βάζουμε μια εναλλακτική ονομασία
+        $username = !empty($row['username']) ? $row['username'] : "Player_" . substr($row['uuid'], 0, 5);
 
         $formattedData[] = [
-            'uuid' => $uuid,
+            'uuid' => $row['uuid'],
             'username' => $username,
-            'playtime' => $hours . ' hrs'
+            $formattedData['playtime'] = $hours . ' hrs'
         ];
     }
 
