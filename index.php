@@ -14,12 +14,11 @@ try {
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
     if ($period === 'weekly') {
-        // Αν το ajLeaderboards δημιουργεί ξεχωριστό πίνακα για weekly (π.χ. ajlb_statistic_play_one_minute_weekly)
-        // Ανάλογα με την ονομασία του πίνακα, αλλάζεις το παρακάτω:
-        $sql = "SELECT t.id as uuid, t.value, a.realname as username 
-                FROM ajlb_statistic_play_one_minute_weekly t 
+        // Παίρνουμε τα εβδομαδιαία δεδομένα από τη στήλη weekly_delta του βασικού πίνακα
+        $sql = "SELECT t.id as uuid, t.weekly_delta as value, a.realname as username 
+                FROM ajlb_statistic_play_one_minute t 
                 LEFT JOIN authme a ON t.id = a.uuid 
-                ORDER BY CAST(t.value AS UNSIGNED) DESC 
+                ORDER BY CAST(t.weekly_delta AS UNSIGNED) DESC 
                 LIMIT 25";
         $stmt = $pdo->prepare($sql);
         $stmt->execute();
