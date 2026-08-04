@@ -13,6 +13,7 @@ try {
     $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
+    // SQL ερώτημα βάσει του περιοδικού πίνακα playtime και SkinRestorer[cite: 11]
     if ($period === 'weekly') {
         $sql = "SELECT t.id as uuid, t.weekly_delta as value, a.realname as username, sr.skin_identifier, sr.skin_type 
                 FROM ajlb_statistic_play_one_minute t 
@@ -41,18 +42,18 @@ try {
         $hours = round($ticks / 72000, 2);
         
         $username = !empty($row['username']) ? trim($row['username']) : "Player_" . substr($row['uuid'], 0, 5);
-        $skinType = strtoupper($row['skin_type'] ?? '');
+        $skinType = strtoupper(trim($row['skin_type'] ?? ''));
         $skinId   = trim($row['skin_identifier'] ?? '');
 
-        // Προεπιλεγμένο fallback url με το username αντί για offline UUID
+        // Fallback head URL με βάση το username
         $headUrl = "https://mc-heads.net/avatar/" . urlencode($username) . "/50";
 
         if (!empty($skinId)) {
-            if ($skinType === 'URL') {
-                // Επεξεργασία Direct Image URL μέσω PHP GD
+            // Αν το skin είναι τύπου URL (π.χ. Imgur)
+            if ($skinType === 'URL' || filter_var($skinId, FILTER_VALIDATE_URL) || strpos($skinId, 'http') === 0) {
                 if ($hasGd) {
                     $context = stream_context_create([
-                        'http' => ['timeout' => 3, 'user_agent' => 'Mozilla/5.0']
+                        'http' => ['timeout' => 4, 'user_agent' => 'Mozilla/5.0']
                     ]);
                     $skinContent = @file_get_contents($skinId, false, $context);
                     if ($skinContent !== false) {
@@ -63,9 +64,9 @@ try {
                             $transparent = imagecolorallocatealpha($headImg, 0, 0, 0, 127);
                             imagefill($headImg, 0, 0, $transparent);
                             
-                            // Κόψιμο βασικού προσώπου (8x8 στα pixels 8,8)
+                            // Κοπή βασικού προσώπου (8x8 στα pixels 8,8)
                             imagecopyresampled($headImg, $skinImg, 0, 0, 8, 8, 50, 50, 8, 8);
-                            // Κόψιμο εξωτερικού layer / καπέλου (8x8 στα pixels 40,8)
+                            // Κοπή εξωτερικού layer / καπέλου (8x8 στα pixels 40,8)
                             imagecopyresampled($headImg, $skinImg, 0, 0, 40, 8, 50, 50, 8, 8);
                             
                             ob_start();
@@ -78,7 +79,7 @@ try {
                     }
                 }
             } else {
-                // Αν είναι όνομα παίκτη (PLAYER / Custom Name), ζητάμε το κεφάλι βάσει του skin_identifier
+                // Αν είναι όνομα από το SkinRestorer
                 $headUrl = "https://mc-heads.net/avatar/" . urlencode($skinId) . "/50";
             }
         }
