@@ -22,22 +22,29 @@ try {
         $ticks = intval($row['value']);
         $hours = round($ticks / 72000, 2);
 
-        // Μετατροπή UUID σε Username μέσω Mojang API
         $uuidClean = str_replace('-', '', $row['uuid']);
-        $username = $row['uuid']; 
-        $mojangUrl = "https://sessionserver.mojang.com/session/minecraft/profile/" . $uuidClean;
-        
-        $opts = ['http' => ['header' => "User-Agent: PHP\r\n"]];
+        $username = "Player";
+
+        // Χρησιμοποιούμε το Minetools API γιατί δεν μπλοκάρει από το Render
+        $apiUrl = "https://api.minetools.eu/profile/" . $uuidClean;
+        $opts = ['http' => ['header' => "User-Agent: Mozilla/5.0\r\n", 'timeout' => 3]];
         $context = stream_context_create($opts);
-        $response = @file_get_contents($mojangUrl, false, $context);
+        $response = @file_get_contents($apiUrl, false, $context);
+        
         if ($response) {
             $data = json_decode($response, true);
-            if (isset($data['name'])) {
-                $username = $data['name'];
+            if (isset($data['decoded']['profileName'])) {
+                $username = $data['decoded']['profileName'];
             }
         }
 
+        // Fallback αν δεν βρεθεί όνομα
+        if ($username === "Player" || empty($username)) {
+            $username = "Player_" . substr($row['uuid'], 0, 5);
+        }
+
         $formattedData[] = [
+            'uuid' => $row['uuid'],
             'username' => $username,
             'playtime' => $hours . ' hrs'
         ];
