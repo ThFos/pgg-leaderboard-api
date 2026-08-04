@@ -14,19 +14,19 @@ try {
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
     if ($period === 'weekly') {
-        // Παίρνουμε τα εβδομαδιαία δεδομένα από τη στήλη weekly_delta του βασικού πίνακα
-        $sql = "SELECT t.id as uuid, t.weekly_delta as value, a.realname as username 
+        $sql = "SELECT t.id as uuid, t.weekly_delta as value, a.realname as username, sr.skin_identifier, sr.skin_type 
                 FROM ajlb_statistic_play_one_minute t 
                 LEFT JOIN authme a ON t.id = a.uuid 
+                LEFT JOIN skinrestorer_players sr ON t.id = sr.uuid 
                 ORDER BY CAST(t.weekly_delta AS UNSIGNED) DESC 
                 LIMIT 25";
         $stmt = $pdo->prepare($sql);
         $stmt->execute();
     } else {
-        // All-Time από τον κύριο πίνακα
-        $sql = "SELECT t.id as uuid, t.value, a.realname as username 
+        $sql = "SELECT t.id as uuid, t.value, a.realname as username, sr.skin_identifier, sr.skin_type 
                 FROM ajlb_statistic_play_one_minute t 
                 LEFT JOIN authme a ON t.id = a.uuid 
+                LEFT JOIN skinrestorer_players sr ON t.id = sr.uuid 
                 ORDER BY CAST(t.value AS UNSIGNED) DESC 
                 LIMIT 25";
         $stmt = $pdo->prepare($sql);
@@ -45,7 +45,9 @@ try {
         $formattedData[] = [
             'uuid' => $row['uuid'],
             'username' => $username,
-            'playtime' => $hours . ' hrs'
+            'playtime' => $hours . ' hrs',
+            'skin_identifier' => $row['skin_identifier'],
+            'skin_type' => $row['skin_type']
         ];
     }
 
