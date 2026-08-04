@@ -13,7 +13,8 @@ try {
     $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    $stmt = $pdo->prepare("SELECT id as uuid, value FROM ajlb_extras WHERE placeholder = ? ORDER BY CAST(value AS UNSIGNED) DESC LIMIT 5");
+    // Αλλαγή από LIMIT 5 σε LIMIT 25
+    $stmt = $pdo->prepare("SELECT id as uuid, value FROM ajlb_extras WHERE placeholder = ? ORDER BY CAST(value AS UNSIGNED) DESC LIMIT 25");
     $stmt->execute(['statistic_play_one_minute']);
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -24,15 +25,13 @@ try {
 
         $uuid = $row['uuid'];
 
-        // Λίστα με τα ονόματα των παίκτών βάσει του UUID τους
+        // Λίστα με τα ονόματα των παικτών βάσει του UUID τους
         $knownPlayers = [
             'b0635010-209e-37d0-9573-39a7e4cf18f3' => 'ThFos'
-            // Αν θες να προσθέσεις κι άλλον παίκτη στο μέλλον, τον βάζεις έτσι:
-            // 'άλλο-uuid-εδώ' => 'ΌνομαΠαίκτη'
+            // Εδώ μπορείς να προσθέσεις κι άλλους παίκτες: 'uuid' => 'Username'
         ];
 
-        // Αν υπάρχει στη λίστα παίρνει το σωστό όνομα, αλλιώς βάζει προσωρινό
-        $username = isset($knownPlayers[$uuid]) ? $knownPlayers[$uuid] : "Player";
+        $username = isset($knownPlayers[$uuid]) ? $knownPlayers[$uuid] : "Player_" . substr($uuid, 0, 5);
 
         $formattedData[] = [
             'uuid' => $uuid,
