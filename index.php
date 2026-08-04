@@ -15,22 +15,26 @@ try {
     $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // Παίρνουμε τους παίκτες από τον πίνακα ajlb_extras για το placeholder των kills
+    // Παίρνουμε τους παίκτες για το playtime (statistic_play_one_minute)
     $stmt = $pdo->prepare("SELECT id as uuid, value FROM ajlb_extras WHERE placeholder = ? ORDER BY CAST(value AS UNSIGNED) DESC LIMIT 5");
-    $stmt->execute(['statistic_player_kills']);
+    $stmt->execute(['statistic_play_one_minute']);
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $formattedData = [];
     foreach ($results as $row) {
+        $ticks = intval($row['value']);
+        // Μετατροπή ticks σε ώρες (72000 ticks = 1 ώρα)
+        $hours = round($ticks / 72000, 2);
+
         $formattedData[] = [
             'uuid' => $row['uuid'],
-            'value' => $row['value']
+            'playtime' => $hours . ' hrs'
         ];
     }
 
     echo json_encode($formattedData);
 
-} catch (PDOException $e) {
+} catch (PDOException$e) {
     echo json_encode([]);
 }
 ?>
