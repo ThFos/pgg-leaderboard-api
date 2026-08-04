@@ -40,37 +40,54 @@ try {
         $ticks = intval($row['value']);
         $hours = round($ticks / 72000, 2);
         
-        $username = !empty($row['username']) ? $row['username'] : "Player_" . substr($row['uuid'], 0, 5);
-        $headUrl = "https://mc-heads.net/avatar/" . $row['uuid'] . "/50";
+        $username = !empty($row['username']) ? trim($row['username']) : "Player_" . substr($row['uuid'], 0, 5);
+        $skinType = strtoupper($row['skin_type'] ?? '');
+        $skinId   = trim($row['skin_identifier'] ?? '');
 
-        if ($hasGd && $row['skin_type'] === 'URL' && !empty($row['skin_identifier'])) {
-            $skinContent = @file_get_contents($row['skin_identifier']);
-            if ($skinContent !== false) {
-                $skinImg = @imagecreatefromstring($skinContent);
-                if ($skinImg !== false) {
-                    $headImg = imagecreatetruecolor(50, 50);
-                    imagesavealpha($headImg, true);
-                    $transparent = imagecolorallocatealpha($headImg, 0, 0, 0, 127);
-                    imagefill($headImg, 0, 0, $transparent);
-                    
-                    imagecopyresampled($headImg, $skinImg, 0, 0, 8, 8, 50, 50, 8, 8);
-                    imagecopyresampled($headImg, $skinImg, 0, 0, 40, 8, 50, 50, 8, 8);
-                    
-                    ob_start();
-                    imagepng($headImg);
-                    $headUrl = 'data:image/png;base64,' . base64_encode(ob_get_clean());
-                    
-                    imagedestroy($skinImg);
-                    imagedestroy($headImg);
+        // Προεπιλεγμένο fallback url με το username αντί για offline UUID
+        $headUrl = "https://mc-heads.net/avatar/" . urlencode($username) . "/50";
+
+        if (!empty($skinId)) {
+            if ($skinType === 'URL') {
+                // Επεξεργασία Direct Image URL μέσω PHP GD
+                if ($hasGd) {
+                    $context = stream_context_create([
+                        'http' => ['timeout' => 3, 'user_agent' => 'Mozilla/5.0']
+                    ]);
+                    $skinContent = @file_get_contents($skinId, false, $context);
+                    if ($skinContent !== false) {
+                        $skinImg = @imagecreatefromstring($skinContent);
+                        if ($skinImg !== false) {
+                            $headImg = imagecreatetruecolor(50, 50);
+                            imagesavealpha($headImg, true);
+                            $transparent = imagecolorallocatealpha($headImg, 0, 0, 0, 127);
+                            imagefill($headImg, 0, 0, $transparent);
+                            
+                            // Κόψιμο βασικού προσώπου (8x8 στα pixels 8,8)
+                            imagecopyresampled($headImg, $skinImg, 0, 0, 8, 8, 50, 50, 8, 8);
+                            // Κόψιμο εξωτερικού layer / καπέλου (8x8 στα pixels 40,8)
+                            imagecopyresampled($headImg, $skinImg, 0, 0, 40, 8, 50, 50, 8, 8);
+                            
+                            ob_start();
+                            imagepng($headImg);
+                            $headUrl = 'data:image/png;base64,' . base64_encode(ob_get_clean());
+                            
+                            imagedestroy($skinImg);
+                            imagedestroy($headImg);
+                        }
+                    }
                 }
+            } else {
+                // Αν είναι όνομα παίκτη (PLAYER / Custom Name), ζητάμε το κεφάλι βάσει του skin_identifier
+                $headUrl = "https://mc-heads.net/avatar/" . urlencode($skinId) . "/50";
             }
         }
 
         $formattedData[] = [
-            'uuid' => $row['uuid'],
+            'uuid'     => $row['uuid'],
             'username' => $username,
             'playtime' => $hours . ' hrs',
-            'headUrl' => $headUrl
+            'headUrl'  => $headUrl
         ];
     }
 
