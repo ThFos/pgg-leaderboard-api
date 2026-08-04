@@ -13,8 +13,15 @@ try {
     $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // Φέρνει τους Top 25 παίκτες
-    $stmt = $pdo->prepare("SELECT id as uuid, value FROM ajlb_extras WHERE placeholder = ? ORDER BY CAST(value AS UNSIGNED) DESC LIMIT 25");
+    // Κάνουμε JOIN με τον πίνακα ajlb_players για να παίρνει αυτόματα το όνομα του κάθε παίκτη από τη βάση
+    $sql = "SELECT e.id as uuid, e.value, p.name as username 
+            FROM ajlb_extras e 
+            LEFT JOIN ajlb_players p ON e.id = p.uuid 
+            WHERE e.placeholder = ? 
+            ORDER BY CAST(e.value AS UNSIGNED) DESC 
+            LIMIT 25";
+
+    $stmt = $pdo->prepare($sql);
     $stmt->execute(['statistic_play_one_minute']);
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -24,16 +31,9 @@ try {
         $hours = round($ticks / 72000, 2);
 
         $uuid = $row['uuid'];
-
-        // --- ΛΙΣΤΑ ΠΑΙΚΤΩΝ (UUID => USERNAME) ---
-        // Πρόσθεσε εδώ όποιον άλλο παίκτη θέλεις στο μέλλον
-        $knownPlayers = [
-            'b0635010-209e-37d0-9573-39a7e4cf18f3' => 'ThFos',
-            '530fa97a-357f-3c19-94d3-0c5c65c18fe8' => 'Ονομα_Παίκτη' // <-- Βάλε εδώ το κανονικό του username
-        ];
-
-        // Αν υπάρχει στη λίστα παίρνει το όνομα, αλλιώς βάζει το προσωρινό
-        $username = isset($knownPlayers[$uuid]) ? $knownPlayers[$uuid] : "Player_" . substr($uuid, 0, 5);
+        
+        // Αν η βάση έχει αποθηκευμένο το όνομα, το χρησιμοποιεί. Αλλιώς βάζει fallback.
+        $username = (!empty($row['username'])) ? $row['username'] : "Player_" . substr($uuid, 0, 5);
 
         $formattedData[] = [
             'uuid' => $uuid,
