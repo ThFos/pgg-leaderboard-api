@@ -13,7 +13,6 @@ try {
     $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // Διόρθωση: Σύνδεση με τον πίνακα skinrestorer_player_history παίρνοντας το πιο πρόσφατο skin ανά UUID
     $srJoin = "LEFT JOIN (
                 SELECT h1.uuid, h1.skin_identifier, h1.skin_type 
                 FROM skinrestorer_player_history h1
@@ -55,11 +54,9 @@ try {
         $skinType = strtoupper(trim($row['skin_type'] ?? ''));
         $skinId   = trim($row['skin_identifier'] ?? '');
 
-        // Fallback head URL με βάση το username
         $headUrl = "https://mc-heads.net/avatar/" . urlencode($username) . "/50";
 
         if (!empty($skinId)) {
-            // Αν είναι Imgur link ή URL
             if ($skinType === 'URL' || filter_var($skinId, FILTER_VALIDATE_URL) || strpos($skinId, 'http') === 0) {
                 if ($hasGd) {
                     $context = stream_context_create([
@@ -74,9 +71,7 @@ try {
                             $transparent = imagecolorallocatealpha($headImg, 0, 0, 0, 127);
                             imagefill($headImg, 0, 0, $transparent);
                             
-                            // Κοπή βασικού προσώπου (8x8 στα pixels 8,8)
                             imagecopyresampled($headImg, $skinImg, 0, 0, 8, 8, 50, 50, 8, 8);
-                            // Κοπή εξωτερικού layer / καπέλου (8x8 στα pixels 40,8)
                             imagecopyresampled($headImg, $skinImg, 0, 0, 40, 8, 50, 50, 8, 8);
                             
                             ob_start();
@@ -89,7 +84,6 @@ try {
                     }
                 }
             } else {
-                // Αν είναι όνομα skin
                 $headUrl = "https://mc-heads.net/avatar/" . urlencode($skinId) . "/50";
             }
         }
@@ -98,7 +92,7 @@ try {
             'uuid'     => $row['uuid'],
             'username' => $username,
             'playtime' => $hours . ' hrs',
-            'headUrl'  -> $headUrl
+            'headUrl'  => $headUrl
         ];
     }
 
