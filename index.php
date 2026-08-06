@@ -53,15 +53,25 @@ try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute();
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
     $formattedData = [];
+    $seenUuids = []; // Πίνακας για αποφυγή διπλοεγγραφών ανά παίκτη
 
     $hasGd = extension_loaded('gd');
 
     foreach ($results as $row) {
+        $uuid = trim($row['uuid']);
+
+        // Αν το UUID έχει ήδη προστεθεί, προσπερνάμε αυτή τη γραμμή
+        if (in_array($uuid, $seenUuids)) {
+            continue;
+        }
+        $seenUuids[] = $uuid;
+
         $ticks = intval($row['value']);
         $hours = round($ticks / 72000, 2);
         
-        $username = !empty($row['username']) ? trim($row['username']) : "Player_" . substr($row['uuid'], 0, 5);
+        $username = !empty($row['username']) ? trim($row['username']) : "Player_" . substr($uuid, 0, 5);
         $skinType = strtoupper(trim($row['skin_type'] ?? ''));
         $skinId   = trim($row['skin_identifier'] ?? '');
         $skinBase64 = trim($row['skin_base64'] ?? '');
@@ -146,7 +156,7 @@ try {
         }
 
         $formattedData[] = [
-            'uuid'     => $row['uuid'],
+            'uuid'     => $uuid,
             'username' => $username,
             'playtime' => $hours . ' hrs',
             'headUrl'  => $headUrl
