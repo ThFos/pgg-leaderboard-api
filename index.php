@@ -2,10 +2,10 @@
 header("Access-Control-Allow-Origin: *");
 header('Content-Type: application/json');
 
-$host = 'uk02-sql.pebblehost.com';
-$db   = 'customer_1492946_ajLeaderboards';
-$user = 'customer_1492946_ajLeaderboards';
-$pass = 'CdVtoTa=rof231sr8fa1PGy^';
+$host = getenv('DB_HOST');
+$db   = getenv('DB_NAME');
+$user = getenv('DB_USER');
+$pass = getenv('DB_PASS');
 
 $period = isset($_GET['period']) ? $_GET['period'] : 'all';
 
